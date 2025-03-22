@@ -5,6 +5,7 @@ def auto_fill_logbook(
     total_distance_miles: float,
     previous_total_time_traveled: float = 0,
     prev_sleeper_berth_hr: float = 0,
+    prev_miles_traveled: float = 0
 ):
     """
     Simulates and generates a driver's logbook based on given parameters.
@@ -22,7 +23,7 @@ def auto_fill_logbook(
     """
 
     driving_time = total_time_minutes
-    miles_traveled = 0  # Track distance driven
+    miles_traveled = prev_miles_traveled  # Track distance driven
     time_traveled_within_eight_hrs = 0
     current_on_duty_hour = 0
 
@@ -145,10 +146,8 @@ def auto_fill_logbook(
             )
 
             # Stop Driving after 11 total hours of driving or 14 hours of on-duty (Switch to Sleeper Berth)
-        if time_spent_in_driving >= 10 or current_on_duty_hour >= 13:
-            print(
-                f"{'Mandatory rest after 11 hr' if time_spent_in_driving >= 10 else '14-hour limit reached'}"
-            )
+        if time_spent_in_driving >= 10.5 or current_on_duty_hour >= 13.5:
+            
             new_log["logbook"].append({"hour": current_hour, "row": "sleeper"})
 
             # Stay in Sleeper Berth for 10 hours
@@ -162,15 +161,16 @@ def auto_fill_logbook(
             new_log["timeSpentInDriving"] = time_spent_in_driving
             new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
 
-            # Start a New Day & Continue Logging (Recursive Call)
+            
             next_day_logs = auto_fill_logbook(
                 current_cycle_hours,
                 duration_from_current_location_to_pickup
                 - total_time_traveled,  # Remaining travel time to pickup
-                total_time_minutes - total_time_traveled,  # Remaining total trip time
+                total_time_minutes,  # Remaining total trip time
                 total_distance_miles,
                 total_time_traveled,  # Keep tracking time across days
                 time_to_stay_in_sleeper_berth,
+                miles_traveled
             )
 
             return logbooks + next_day_logs  # Combine all logbooks
@@ -206,9 +206,7 @@ def auto_fill_logbook(
 
         # Mandatory 30-min break after 8 hours driving or to refuel after 1,000 miles
         if time_traveled_within_eight_hrs >= 7 * 60 or miles_traveled >= 1000:
-            print(
-                f"{'Mandatory rest after 8hr' if time_traveled_within_eight_hrs >= 7 * 60 else 'Refuelling'}"
-            )
+            
             new_log["logbook"].append({"hour": current_hour, "row": "on-duty"})
             current_hour += 0.5
             current_on_duty_hour += 0.5
@@ -231,10 +229,8 @@ def auto_fill_logbook(
             )
 
         # Stop Driving after 11 total hours of driving or 14 hours of on-duty (Switch to Sleeper Berth)
-        if time_spent_in_driving >= 10 or current_on_duty_hour >= 13:
-            print(
-                f"{'Mandatory rest after 11 hr' if time_spent_in_driving >= 10 else '14-hour limit reached'}"
-            )
+        if time_spent_in_driving >= 10.5 or current_on_duty_hour >= 13.5:
+            
             new_log["logbook"].append({"hour": current_hour, "row": "sleeper"})
 
             # Stay in Sleeper Berth for 10 hours
@@ -253,10 +249,11 @@ def auto_fill_logbook(
                 current_cycle_hours,
                 duration_from_current_location_to_pickup
                 - total_time_traveled,  # Remaining travel time to pickup
-                total_time_minutes - total_time_traveled,  # Remaining total trip time
+                total_time_minutes,  # Remaining total trip time
                 total_distance_miles,
                 total_time_traveled,  # Keep tracking time across days
                 time_to_stay_in_sleeper_berth,
+                miles_traveled
             )
 
             return logbooks + next_day_logs  # Combine all logbooks
@@ -273,7 +270,7 @@ def auto_fill_logbook(
 
     # Step 9: Switch to Sleeper Berth (End of the Trip)
     new_log["logbook"].append({"hour": current_hour, "row": "sleeper"})
-    print("Switching to sleeper berth")
+   
     time_to_stay_in_sleeper_berth = 24 - current_hour
     current_hour += time_to_stay_in_sleeper_berth
     time_spent_in_sleeper_berth += time_to_stay_in_sleeper_berth
