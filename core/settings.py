@@ -114,3 +114,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "https://eld-generator.netlify.app",
 ]
+ALLOWED_HOSTS =[
+    "fw8-bold-feynman.circumeo-apps.net"
+]
