@@ -25,7 +25,6 @@ class LogEntryViewSet(viewsets.ModelViewSet):
             if any(
                 val <= 0
                 for val in [
-                    current_cycle_hour,
                     total_driving_time,
                     pickup_time,
                     total_distance_miles,
