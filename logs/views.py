@@ -41,20 +41,14 @@ class LogEntryViewSet(viewsets.ModelViewSet):
             remaining_cycle_hours = (70 - current_cycle_hour) * 60
             pick_up_and_drop_off_time = 60  # 60 minutes
             num_fueling_stops = total_distance_miles // 1000
-            num_of_rest_after_eight_hr_driving = total_driving_time // (60 * 8)
-            total_resting_time_after_eight_hr_driving = (
-                num_of_rest_after_eight_hr_driving * 30
-            )  # 30 mins per rest
+
             total_time_to_refuel = (
                 num_fueling_stops * 30
             )  # Assuming refuelling takes 30 minutes
             total_on_duty_time = (
-                total_driving_time
-                + total_time_to_refuel
-                + pick_up_and_drop_off_time
-                + total_resting_time_after_eight_hr_driving
+                total_driving_time + total_time_to_refuel + pick_up_and_drop_off_time
             )
-           
+
             if remaining_cycle_hours < total_on_duty_time:
                 return Response(
                     {

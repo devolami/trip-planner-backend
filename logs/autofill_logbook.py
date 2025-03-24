@@ -5,7 +5,7 @@ def auto_fill_logbook(
     total_distance_miles: float,
     previous_total_time_traveled: float = 0,
     prev_sleeper_berth_hr: float = 0,
-    prev_miles_traveled: float = 0
+    prev_miles_traveled: float = 0,
 ):
     """
     Simulates and generates a driver's logbook based on given parameters.
@@ -126,7 +126,7 @@ def auto_fill_logbook(
         if time_traveled_within_eight_hrs >= 7 * 60:
             new_log["logbook"].append({"hour": current_hour, "row": "off-duty"})
             current_hour += 0.5
-            
+
             time_spent_in_off_duty += 0.5
             new_log["logbook"].append(
                 {"hour": current_hour, "row": "off-duty", "action": "30-minute break"}
@@ -146,12 +146,11 @@ def auto_fill_logbook(
             )
             new_log["logbook"].append({"hour": current_hour, "row": "driving"})
             miles_traveled = 0
-
-
+            time_traveled_within_eight_hrs = 0
 
             # Stop Driving at least every 11 total hours of driving or 14 hours of on-duty (Switch to Sleeper Berth)
         if time_spent_in_driving >= 10.5 or current_on_duty_hour >= 13.5:
-            
+
             new_log["logbook"].append({"hour": current_hour, "row": "sleeper"})
 
             # Stay in Sleeper Berth for 10 hours
@@ -164,9 +163,7 @@ def auto_fill_logbook(
             new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
             new_log["timeSpentInDriving"] = time_spent_in_driving
             new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
-           
 
-            
             next_day_logs = auto_fill_logbook(
                 current_cycle_hours,
                 duration_from_current_location_to_pickup
@@ -175,7 +172,7 @@ def auto_fill_logbook(
                 total_distance_miles,
                 total_time_traveled,  # Keep tracking time across days
                 time_to_stay_in_sleeper_berth,
-                miles_traveled
+                miles_traveled,
             )
 
             return logbooks + next_day_logs  # Combine all logbooks
@@ -186,6 +183,7 @@ def auto_fill_logbook(
     current_hour += 0.5  # 30-minute On-Duty for Pickup
     current_on_duty_hour += 0.5
     time_spent_in_on_duty += 0.5
+    time_traveled_within_eight_hrs = 0
 
     new_log["logbook"].append(
         {"hour": current_hour, "row": "on-duty", "action": "Pickup"}
@@ -209,11 +207,11 @@ def auto_fill_logbook(
             total_distance_miles / driving_time
         ) * 30  # Convert minutes to miles
 
-       # Mandatory 30-min break after at least every 8 hours of driving
+        # Mandatory 30-min break after at least every 8 hours of driving
         if time_traveled_within_eight_hrs >= 7 * 60:
             new_log["logbook"].append({"hour": current_hour, "row": "off-duty"})
             current_hour += 0.5
-            
+
             time_spent_in_off_duty += 0.5
             new_log["logbook"].append(
                 {"hour": current_hour, "row": "off-duty", "action": "30-minute break"}
@@ -233,11 +231,11 @@ def auto_fill_logbook(
             )
             new_log["logbook"].append({"hour": current_hour, "row": "driving"})
             miles_traveled = 0
-
+            time_traveled_within_eight_hrs = 0
 
         # Stop Driving at least every 11 total hours of driving or 14 hours of on-duty (Switch to Sleeper Berth)
         if time_spent_in_driving >= 10.5 or current_on_duty_hour >= 13.5:
-            
+
             new_log["logbook"].append({"hour": current_hour, "row": "sleeper"})
 
             # Stay in Sleeper Berth for 10 hours
@@ -261,7 +259,7 @@ def auto_fill_logbook(
                 total_distance_miles,
                 total_time_traveled,  # Keep tracking time across days
                 time_to_stay_in_sleeper_berth,
-                miles_traveled
+                miles_traveled,
             )
 
             return logbooks + next_day_logs  # Combine all logbooks
@@ -272,13 +270,14 @@ def auto_fill_logbook(
     current_hour += 0.5
     current_on_duty_hour += 0.5
     time_spent_in_on_duty += 0.5
+    time_traveled_within_eight_hrs = 0
     new_log["logbook"].append(
         {"hour": current_hour, "row": "on-duty", "action": "Drop-off"}
     )
 
     # Step 9: Switch to Sleeper Berth (End of the Trip)
     new_log["logbook"].append({"hour": current_hour, "row": "sleeper"})
-   
+
     time_to_stay_in_sleeper_berth = 24 - current_hour
     current_hour += time_to_stay_in_sleeper_berth
     time_spent_in_sleeper_berth += time_to_stay_in_sleeper_berth
@@ -288,6 +287,5 @@ def auto_fill_logbook(
     new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
     new_log["timeSpentInDriving"] = time_spent_in_driving
     new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
-    
 
     return logbooks  # Return multiple days of logs
