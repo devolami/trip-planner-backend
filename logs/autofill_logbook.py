@@ -122,28 +122,32 @@ def auto_fill_logbook(
             total_distance_miles / driving_time
         ) * 30  # Convert minutes to miles
 
-        # Mandatory 30-min break after at least every 8 hours of driving or to refuel at least every 1,000 miles
-        if time_traveled_within_eight_hrs >= 7 * 60 or miles_traveled >= 950:
+        # Mandatory 30-min break after at least every 8 hours of driving
+        if time_traveled_within_eight_hrs >= 7 * 60:
+            new_log["logbook"].append({"hour": current_hour, "row": "off-duty"})
+            current_hour += 0.5
+            
+            time_spent_in_off_duty += 0.5
+            new_log["logbook"].append(
+                {"hour": current_hour, "row": "off-duty", "action": "30-minute break"}
+            )
+
+            new_log["logbook"].append({"hour": current_hour, "row": "driving"})
+            time_traveled_within_eight_hrs = 0
+
+        # Refuelling
+        if miles_traveled >= 950:
             new_log["logbook"].append({"hour": current_hour, "row": "on-duty"})
             current_hour += 0.5
             current_on_duty_hour += 0.5
             time_spent_in_on_duty += 0.5
-            action = (
-                "30-minute break"
-                if time_traveled_within_eight_hrs >= 7 * 60
-                else "Refuelling"
-            )
             new_log["logbook"].append(
-                {"hour": current_hour, "row": "on-duty", "action": action}
+                {"hour": current_hour, "row": "on-duty", "action": "Refuelling"}
             )
-
             new_log["logbook"].append({"hour": current_hour, "row": "driving"})
-            miles_traveled = 0 if miles_traveled >= 950 else miles_traveled
-            time_traveled_within_eight_hrs = (
-                0
-                if time_traveled_within_eight_hrs >= 7 * 60
-                else time_traveled_within_eight_hrs
-            )
+            miles_traveled = 0
+
+
 
             # Stop Driving at least every 11 total hours of driving or 14 hours of on-duty (Switch to Sleeper Berth)
         if time_spent_in_driving >= 10.5 or current_on_duty_hour >= 13.5:
@@ -160,6 +164,7 @@ def auto_fill_logbook(
             new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
             new_log["timeSpentInDriving"] = time_spent_in_driving
             new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
+           
 
             
             next_day_logs = auto_fill_logbook(
@@ -204,29 +209,31 @@ def auto_fill_logbook(
             total_distance_miles / driving_time
         ) * 30  # Convert minutes to miles
 
-        # Mandatory 30-min break after at least every 8 hours of driving or to refuel at least every 1,000 miles
-        if time_traveled_within_eight_hrs >= 7 * 60 or miles_traveled >= 950:
+       # Mandatory 30-min break after at least every 8 hours of driving
+        if time_traveled_within_eight_hrs >= 7 * 60:
+            new_log["logbook"].append({"hour": current_hour, "row": "off-duty"})
+            current_hour += 0.5
             
+            time_spent_in_off_duty += 0.5
+            new_log["logbook"].append(
+                {"hour": current_hour, "row": "off-duty", "action": "30-minute break"}
+            )
+
+            new_log["logbook"].append({"hour": current_hour, "row": "driving"})
+            time_traveled_within_eight_hrs = 0
+
+        # Refuelling
+        if miles_traveled >= 950:
             new_log["logbook"].append({"hour": current_hour, "row": "on-duty"})
             current_hour += 0.5
             current_on_duty_hour += 0.5
             time_spent_in_on_duty += 0.5
-            action = (
-                "30-minute break"
-                if time_traveled_within_eight_hrs >= 7 * 60
-                else "Refuelling"
-            )
             new_log["logbook"].append(
-                {"hour": current_hour, "row": "on-duty", "action": action}
+                {"hour": current_hour, "row": "on-duty", "action": "Refuelling"}
             )
-
             new_log["logbook"].append({"hour": current_hour, "row": "driving"})
-            miles_traveled = 0 if miles_traveled >= 950 else miles_traveled
-            time_traveled_within_eight_hrs = (
-                0
-                if time_traveled_within_eight_hrs >= 7 * 60
-                else time_traveled_within_eight_hrs
-            )
+            miles_traveled = 0
+
 
         # Stop Driving at least every 11 total hours of driving or 14 hours of on-duty (Switch to Sleeper Berth)
         if time_spent_in_driving >= 10.5 or current_on_duty_hour >= 13.5:
@@ -243,6 +250,7 @@ def auto_fill_logbook(
             new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
             new_log["timeSpentInDriving"] = time_spent_in_driving
             new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
+            print(time_spent_in_off_duty)
 
             # Start a New Day & Continue Logging (Recursive Call)
             next_day_logs = auto_fill_logbook(
@@ -280,5 +288,6 @@ def auto_fill_logbook(
     new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
     new_log["timeSpentInDriving"] = time_spent_in_driving
     new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
+    
 
     return logbooks  # Return multiple days of logs
