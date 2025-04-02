@@ -3,7 +3,7 @@ from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from .models import LogEntry
 from .serializers import LogSerializers
-from .autofill_logbook import auto_fill_logbook  # Ensure this function is imported
+from .autofill_logbook import auto_fill_logbook
 
 
 class LogEntryViewSet(viewsets.ModelViewSet):
@@ -60,7 +60,6 @@ class LogEntryViewSet(viewsets.ModelViewSet):
 
             #  Generate logbook data
             logbooks = auto_fill_logbook(
-                current_cycle_hours=current_cycle_hour,
                 total_time_minutes=total_driving_time,
                 duration_from_current_location_to_pickup=pickup_time,
                 total_distance_miles=total_distance_miles,
