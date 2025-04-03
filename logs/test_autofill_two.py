@@ -104,18 +104,28 @@ def auto_fill_logbook(
             total_time_traveled,
         )
         # Handle Maximum 11-hour max driving and 14-hour max on duty time
+        # current_hour, logbooks = handle_driving_and_on_duty_limits(
+        #     new_log,
+        #     time_spent,
+        #     current_on_duty_hour,
+        #     current_hour,
+        #     duration_from_current_location_to_pickup - total_time_traveled,
+        #     total_time_minutes,
+        #     total_distance_miles,
+        #     total_time_traveled,
+        #     miles_traveled,
+        #     prev_has_arrived_at_pickup=False,
+        #     logbooks=logbooks,
+        # )
+
         current_hour, logbooks = handle_driving_and_on_duty_limits(
             new_log,
             time_spent,
             current_on_duty_hour,
             current_hour,
-            duration_from_current_location_to_pickup - total_time_traveled,
             total_time_minutes,
-            total_distance_miles,
             total_time_traveled,
-            miles_traveled,
-            prev_has_arrived_at_pickup=False,
-            logbooks=logbooks,
+            logbooks
         )
 
     # Arriving at Pickup
@@ -192,13 +202,9 @@ def auto_fill_logbook(
             time_spent,
             current_on_duty_hour,
             current_hour,
-            driving_time - total_time_traveled,
             total_time_minutes,
-            total_distance_miles,
             total_time_traveled,
-            miles_traveled,
-            prev_has_arrived_at_pickup=True,
-            logbooks=logbooks,
+            logbooks
         )
 
     # Arriving at Drop-off
@@ -387,77 +393,146 @@ def handle_refueling(
         )
 
 
+# def handle_driving_and_on_duty_limits(
+#     log,
+#     time_spent,
+#     current_on_duty_hour,
+#     current_hour,
+#     duration,
+#     total_time_minutes,
+#     total_distance_miles,
+#     total_time_traveled,
+#     miles,
+#     prev_has_arrived_at_pickup,
+#     logbooks,
+# ):
+#     # Define Legal constants
+#     MAX_DRIVING_HOURS = 10.5
+#     MAX_ON_DUTY_HOURS = 13.5
+#     if (
+#         time_spent["driving"] >= MAX_DRIVING_HOURS
+#         or current_on_duty_hour >= MAX_ON_DUTY_HOURS
+#     ):
+#         log["logbook"].append({"hour": current_hour, "row": "sleeper"})
+#         time_to_stay_in_sleeper_berth = 24 - current_hour
+#         current_hour += time_to_stay_in_sleeper_berth
+#         time_spent["sleeper"] += time_to_stay_in_sleeper_berth
+#         log["logbook"].append({"hour": current_hour, "row": "sleeper"})
+
+#         logbooks = start_new_day(
+#             log,
+#             duration,
+#             total_time_minutes,
+#             total_distance_miles,
+#             total_time_traveled,
+#             miles,
+#             logbooks,
+#             current_hour,
+#             time_spent,
+#             prev_has_arrived_at_pickup
+#         )
+#     return current_hour, logbooks
+
 def handle_driving_and_on_duty_limits(
     log,
     time_spent,
     current_on_duty_hour,
     current_hour,
-    duration,
     total_time_minutes,
-    total_distance_miles,
     total_time_traveled,
-    miles,
-    prev_has_arrived_at_pickup,
     logbooks,
 ):
     # Define Legal constants
     MAX_DRIVING_HOURS = 10.5
     MAX_ON_DUTY_HOURS = 13.5
+
     if (
         time_spent["driving"] >= MAX_DRIVING_HOURS
         or current_on_duty_hour >= MAX_ON_DUTY_HOURS
     ):
         log["logbook"].append({"hour": current_hour, "row": "sleeper"})
+        
+        # Calculate how much time to stay in sleeper berth
         time_to_stay_in_sleeper_berth = 24 - current_hour
         current_hour += time_to_stay_in_sleeper_berth
         time_spent["sleeper"] += time_to_stay_in_sleeper_berth
         log["logbook"].append({"hour": current_hour, "row": "sleeper"})
 
-        logbooks = start_new_day(
-            log,
-            duration,
-            total_time_minutes,
-            total_distance_miles,
-            total_time_traveled,
-            miles,
-            logbooks,
-            current_hour,
-            time_spent,
-            prev_has_arrived_at_pickup
-        )
+        # Save current day's logbook
+        logbooks.append(log)
+
+        # Prevent infinite recursion by stopping when the trip is complete
+        if total_time_traveled >= total_time_minutes:
+            return current_hour, logbooks
+        
+        # Create a new day's logbook instead of recursively calling auto_fill_logbook
+        new_log = generate_new_log(total_time_traveled, time_spent)
+        logbooks.append(new_log)
+
     return current_hour, logbooks
 
 
+
+# def start_new_day(
+#     log,
+#     duration,
+#     total_time_minutes,
+#     total_distance_miles,
+#     total_time_traveled,
+#     miles,
+#     logbooks, 
+#     current_hour,
+#     time_spent,
+#     prev_has_arrived_at_pickup = False,
+# ):
+#     """Starts a new day of logging."""
+#     time_to_stay_in_sleeper_berth = 24 - current_hour
+#     current_hour += time_to_stay_in_sleeper_berth
+#     time_spent["sleeper"] += time_to_stay_in_sleeper_berth
+#     log["logbook"].append({"hour": current_hour, "row": "sleeper"})
+
+
+#     next_day_log = auto_fill_logbook(
+#         duration,
+#         total_time_minutes,
+#         total_distance_miles,
+#         total_time_traveled,
+#         time_to_stay_in_sleeper_berth,
+#         miles,
+#         prev_has_arrived_at_pickup,
+#     )
+#     logbooks += next_day_log
+#     return logbooks
+
 def start_new_day(
     log,
-    duration,
     total_time_minutes,
-    total_distance_miles,
     total_time_traveled,
-    miles,
-    logbooks, 
+    logbooks,
     current_hour,
     time_spent,
-    prev_has_arrived_at_pickup = False,
 ):
-    """Starts a new day of logging."""
+    """Starts a new day of logging without causing infinite recursion."""
+    
+    # Calculate time to stay in sleeper berth before new day begins
     time_to_stay_in_sleeper_berth = 24 - current_hour
     current_hour += time_to_stay_in_sleeper_berth
     time_spent["sleeper"] += time_to_stay_in_sleeper_berth
     log["logbook"].append({"hour": current_hour, "row": "sleeper"})
 
+    # Save current day's log
+    logbooks.append(log)
 
-    next_day_log = auto_fill_logbook(
-        duration,
-        total_time_minutes,
-        total_distance_miles,
-        total_time_traveled,
-        time_to_stay_in_sleeper_berth,
-        miles,
-        prev_has_arrived_at_pickup,
-    )
-    logbooks += next_day_log
+    # If trip is complete, stop adding new logs
+    if total_time_traveled >= total_time_minutes:
+        return logbooks
+
+    # Create new day’s log instead of recursive call
+    new_log = generate_new_log(total_time_traveled, time_spent)
+    logbooks.append(new_log)
+    
     return logbooks
+
 
 
 def arrive_at_location(
