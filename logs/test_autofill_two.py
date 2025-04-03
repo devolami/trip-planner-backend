@@ -22,19 +22,20 @@ def auto_fill_logbook(
     """
 
     # Initialize variables
+    driving_time = total_time_minutes
     miles_traveled = prev_miles_traveled
     total_time_traveled = previous_total_time_traveled
     current_hour = 0
     current_on_duty_hour = 0
     time_traveled_within_eight_hrs = 0
-    time_spent = {"off_duty": 0, "on_duty": 0, "driving": 0, "sleeper": 0}
+    time_spent = {"off_duty": 0.0, "on_duty": 0.0, "driving": 0.0, "sleeper": 0.0}
     has_arrived_at_pickup = prev_has_arrived_at_pickup
 
     logbooks = []
     new_log = generate_new_log(total_time_traveled, time_spent)
     logbooks.append(new_log)
 
-    # Handle rest and transition to on-duty
+    # Handle rest and transition to on_duty
     current_hour, current_on_duty_hour, total_time_traveled = handle_day_initial_duty(
         new_log,
         prev_sleeper_berth_hr,
@@ -45,7 +46,9 @@ def auto_fill_logbook(
     )
 
     # Start driving towards pickup or drop-off
-    current_hour = start_driving(new_log, current_hour, time_spent)
+    current_hour, current_on_duty_hour, total_time_traveled = start_driving(
+            new_log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
+        )
 
     # Continue driving towards pickup
     while (
@@ -96,10 +99,12 @@ def auto_fill_logbook(
             current_hour,
             miles_traveled,
             time_spent,
+            current_on_duty_hour,
             time_traveled_within_eight_hrs,
             total_time_traveled,
         )
-        logbooks, new_log, current_hour = handle_driving_and_on_duty_limits(
+        # Handle Maximum 11-hour max driving and 14-hour max on duty time
+        current_hour, logbooks = handle_driving_and_on_duty_limits(
             new_log,
             time_spent,
             current_on_duty_hour,
@@ -124,11 +129,15 @@ def auto_fill_logbook(
             action="Pickup",
         )
         has_arrived_at_pickup = True
+        # Start driving to Drop-Off
+        current_hour, current_on_duty_hour, total_time_traveled = start_driving(
+            new_log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
+        )
 
-    # Start Driving to Drop-off
+    # Continue Driving to Drop-off
     while total_time_traveled < total_time_minutes:
         if total_time_traveled >= total_time_minutes:
-            break  # Trip is complete, return logs
+            break  # Trip is complete
         (
             current_hour,
             miles_traveled,
@@ -145,6 +154,8 @@ def auto_fill_logbook(
             total_time_minutes,
             time_spent,
         )
+
+        # Handle breaks and refuelling
 
         (
             current_hour,
@@ -170,21 +181,23 @@ def auto_fill_logbook(
             current_hour,
             miles_traveled,
             time_spent,
+            current_on_duty_hour,
             time_traveled_within_eight_hrs,
             total_time_traveled,
         )
+        # Handle 11-hour max driving and 14-hour max on duty time
 
-        logbooks, new_log, current_hour = handle_driving_and_on_duty_limits(
+        current_hour, logbooks = handle_driving_and_on_duty_limits(
             new_log,
             time_spent,
             current_on_duty_hour,
             current_hour,
-            duration_from_current_location_to_pickup - total_time_traveled,
+            driving_time - total_time_traveled,
             total_time_minutes,
             total_distance_miles,
             total_time_traveled,
             miles_traveled,
-            prev_has_arrived_at_pickup=False,
+            prev_has_arrived_at_pickup=True,
             logbooks=logbooks,
         )
 
@@ -199,8 +212,7 @@ def auto_fill_logbook(
     )
 
     # End the trip
-    current_hour = end_trip(new_log, current_hour, time_spent, logbooks)
-
+    current_hour = end_trip(new_log, current_hour, time_spent)
     return logbooks
 
 
@@ -212,7 +224,8 @@ def generate_new_log(total_time_traveled, time_spent):
     return {
         "logbook": [],
         "totalTimeTraveled": total_time_traveled,
-        "timeSpent": time_spent.copy(),
+        # "timeSpent": time_spent.copy(),
+        "timeSpent": time_spent,
     }
 
 
@@ -226,34 +239,38 @@ def handle_day_initial_duty(
 ):
     MAX_SLEEPER_BERTH_TIME = 10
     FIRST_DAY_RESUMPTION_TIME = 6.5
-    if prev_sleeper_berth_hr >= MAX_SLEEPER_BERTH_TIME:
-        current_hour = switch_to_on_duty(
-            log, current_hour, time_spent, action="Pre-trip/TIV"
+    if (
+        prev_sleeper_berth_hr >= MAX_SLEEPER_BERTH_TIME
+    ):  # If driver has spent at least 10 hours in sleeper berth on the previous day
+        current_hour, current_on_duty_hour = switch_to_on_duty(
+            log, current_hour, current_on_duty_hour, time_spent, action="Pre-trip/TIV"
         )
         current_hour, current_on_duty_hour, total_time_traveled = start_driving(
             log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
         )
 
-    elif 0 < prev_sleeper_berth_hr < MAX_SLEEPER_BERTH_TIME:
+    elif (
+        0 < prev_sleeper_berth_hr < MAX_SLEEPER_BERTH_TIME
+    ):  # If driver has not spent up to 10 hours in sleeper berth on the previous day
         # Step 1: Start at sleeper berth until you have spent 10 hours there
         log["logbook"].append({"hour": current_hour, "row": "sleeper"})
         current_hour += MAX_SLEEPER_BERTH_TIME - prev_sleeper_berth_hr
         time_spent["sleeper"] += MAX_SLEEPER_BERTH_TIME - prev_sleeper_berth_hr
         log["logbook"].append({"hour": current_hour, "row": "sleeper"})
 
-        current_hour = switch_to_on_duty(
-            log, current_hour, time_spent, action="Pre-trip/TIV"
+        current_hour, current_on_duty_hour = switch_to_on_duty(
+            log, current_hour, current_on_duty_hour, time_spent, action="Pre-trip/TIV"
         )
         current_hour, current_on_duty_hour, total_time_traveled = start_driving(
             log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
         )
-    else:
-        log["logbook"].append({"hour": current_hour, "row": "off-duty"})
+    else:  # First day of trip
+        log["logbook"].append({"hour": current_hour, "row": "off_duty"})
         current_hour += FIRST_DAY_RESUMPTION_TIME
-        time_spent["off-duty"] += FIRST_DAY_RESUMPTION_TIME
-        log["logbook"].append({"hour": current_hour, "row": "off-duty"})
-        current_hour = switch_to_on_duty(
-            log, current_hour, time_spent, action="Pre-trip/TIV"
+        time_spent["off_duty"] += FIRST_DAY_RESUMPTION_TIME
+        log["logbook"].append({"hour": current_hour, "row": "off_duty"})
+        current_hour, current_on_duty_hour = switch_to_on_duty(
+            log, current_hour, current_on_duty_hour, time_spent, action="Pre-trip/TIV"
         )
         current_hour, current_on_duty_hour, total_time_traveled = start_driving(
             log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
@@ -262,19 +279,21 @@ def handle_day_initial_duty(
     return current_hour, current_on_duty_hour, total_time_traveled
 
 
-def switch_to_on_duty(log, current_hour, time_spent, action):
-    """Switches the log to on-duty mode and optionally starts driving."""
-    log["logbook"].append({"hour": current_hour, "row": "on-duty", "action": action})
+def switch_to_on_duty(log, current_hour, current_on_duty_hour, time_spent, action):
+    """Switches the log to on_duty mode and optionally starts driving."""
+    log["logbook"].append({"hour": current_hour, "row": "on_duty"})
     current_hour += 0.5
-    time_spent["on-duty"] += 0.5
+    time_spent["on_duty"] += 0.5
+    current_on_duty_hour += 0
+    log["logbook"].append({"hour": current_hour, "row": "on_duty", "action": action})
 
-    return current_hour
+    return current_hour, current_on_duty_hour
 
 
 def start_driving(
     log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
 ):
-    """Handles the transition from on-duty to driving."""
+    """Handles the transition from on_duty to driving."""
     log["logbook"].append({"hour": current_hour, "row": "driving"})
     current_hour += 0.5
     time_spent["driving"] += 0.5
@@ -321,17 +340,17 @@ def handle_breaks(
     """Handles mandatory 30-minute breaks after 8 hours of driving."""
     MAX_CUMULATIVE_DRIVING_TIME = 7 * 60
     if time_traveled_within_eight_hrs >= MAX_CUMULATIVE_DRIVING_TIME:
-        log["logbook"].append({"hour": current_hour, "row": "off-duty"})
+        log["logbook"].append({"hour": current_hour, "row": "off_duty"})
         current_hour += 0.5
         time_spent["off_duty"] += 0.5
         time_traveled_within_eight_hrs = 0
         log["logbook"].append(
-            {"hour": current_hour, "row": "off-duty", "action": "30-minute break"}
+            {"hour": current_hour, "row": "off_duty", "action": "30-minute break"}
         )
         current_hour, current_on_duty_hour, total_time_traveled = start_driving(
-            log, current_hour, current_on_duty_hour, time_spent, total_time_traveled
+            log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
         )
-        return (
+    return (
             current_hour,
             current_on_duty_hour,
             total_time_traveled,
@@ -351,19 +370,15 @@ def handle_refueling(
     """Handles refueling stops."""
     MAX_MILES_BEFORE_REFUEL = 950  # In miles
     if miles_traveled >= MAX_MILES_BEFORE_REFUEL:
-        log["logbook"].append({"hour": current_hour, "row": "on-duty"})
-        current_hour += 0.5
-        current_on_duty_hour += 0.5
-        time_spent["on_duty"] += 0.5
         miles_traveled = 0
         time_traveled_within_eight_hrs = 0
-        log["logbook"].append(
-            {"hour": current_hour, "row": "on-duty", "action": "Refuelling"}
+        current_hour, current_on_duty_hour = switch_to_on_duty(
+            log, current_hour, current_on_duty_hour, time_spent, action="Refuelling"
         )
         current_hour, current_on_duty_hour, total_time_traveled = start_driving(
-            log, current_hour, current_on_duty_hour, time_spent, total_time_traveled
+            log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
         )
-        return (
+    return (
             current_hour,
             current_on_duty_hour,
             time_traveled_within_eight_hrs,
@@ -397,56 +412,73 @@ def handle_driving_and_on_duty_limits(
         current_hour += time_to_stay_in_sleeper_berth
         time_spent["sleeper"] += time_to_stay_in_sleeper_berth
         log["logbook"].append({"hour": current_hour, "row": "sleeper"})
-        new_log = start_new_day(
+
+        logbooks = start_new_day(
+            log,
             duration,
             total_time_minutes,
             total_distance_miles,
             total_time_traveled,
             miles,
-            time_spent["sleeper"],
-            prev_has_arrived_at_pickup,
+            logbooks,
+            current_hour,
+            time_spent,
+            prev_has_arrived_at_pickup
         )
-        return logbooks, new_log, current_hour
+    return current_hour, logbooks
 
 
 def start_new_day(
+    log,
     duration,
     total_time_minutes,
     total_distance_miles,
     total_time_traveled,
     miles,
-    sleeper,
-    prev_has_arrived_at_pickup,
+    logbooks, 
+    current_hour,
+    time_spent,
+    prev_has_arrived_at_pickup = False,
 ):
     """Starts a new day of logging."""
-    return auto_fill_logbook(
-        duration - total_time_traveled,
+    time_to_stay_in_sleeper_berth = 24 - current_hour
+    current_hour += time_to_stay_in_sleeper_berth
+    time_spent["sleeper"] += time_to_stay_in_sleeper_berth
+    log["logbook"].append({"hour": current_hour, "row": "sleeper"})
+
+
+    next_day_log = auto_fill_logbook(
+        duration,
         total_time_minutes,
         total_distance_miles,
         total_time_traveled,
-        sleeper,
+        time_to_stay_in_sleeper_berth,
         miles,
         prev_has_arrived_at_pickup,
     )
+    logbooks += next_day_log
+    return logbooks
 
 
 def arrive_at_location(
     log, current_hour, time_spent, current_on_duty_hour, total_time_traveled, action
 ):
     """Handles arrival at a location."""
-    current_hour = switch_to_on_duty(log, current_hour, time_spent, action=action)
-    current_hour, current_on_duty_hour, total_time_traveled = start_driving(
-        log, current_hour, current_on_duty_hour, time_spent, total_time_traveled
+    current_hour, current_on_duty_hour = switch_to_on_duty(
+        log, current_hour, current_on_duty_hour, time_spent, action="Refuelling"
     )
+    current_hour, current_on_duty_hour, total_time_traveled = start_driving(
+            log, current_hour, time_spent, current_on_duty_hour, total_time_traveled
+        )
     return current_hour, current_on_duty_hour, total_time_traveled
 
 
 def end_trip(log, current_hour, time_spent):
-    """Handles end of the trip and switching to off-duty."""
-    log["logbook"].append({"hour": current_hour, "row": "off-duty"})
+    """Handles end of the trip and switching to off_duty."""
+    log["logbook"].append({"hour": current_hour, "row": "off_duty"})
     remaining_hour = 24 - current_hour
     current_hour += remaining_hour
-    time_spent["off-duty"] += remaining_hour
-    log["logbook"].append({"hour": current_hour, "row": "off-duty"})
+    time_spent["off_duty"] += remaining_hour
+    log["logbook"].append({"hour": current_hour, "row": "off_duty"})
 
     return current_hour

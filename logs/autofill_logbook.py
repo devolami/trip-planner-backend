@@ -283,7 +283,7 @@ def auto_fill_logbook(
            
             # Start a New Day & Continue Logging (Recursive Call)
             next_day_logs = auto_fill_logbook(
-                duration_from_current_location_to_pickup
+                driving_time
                 - total_time_traveled,  # Remaining travel time to pickup
                 total_time_minutes,  # Remaining total trip time
                 total_distance_miles,

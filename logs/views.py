@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from .models import LogEntry
 from .serializers import LogSerializers
 from .autofill_logbook import auto_fill_logbook
+# from .test_autofill_two import auto_fill_logbook
 
 
 class LogEntryViewSet(viewsets.ModelViewSet):
