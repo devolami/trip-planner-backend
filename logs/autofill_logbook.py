@@ -5,7 +5,7 @@ def auto_fill_logbook(
     previous_total_time_traveled: float = 0,
     prev_sleeper_berth_hr: float = 0,
     prev_miles_traveled: float = 0,
-    prev_has_arrived_at_pickup: bool = False
+    has_arrived_at_pickup: bool = False
 ):
     """
     Simulates and generates a driver's logbook based on given parameters.
@@ -31,7 +31,7 @@ def auto_fill_logbook(
     time_spent_in_on_duty = 0
     time_spent_in_driving = 0
     time_spent_in_sleeper_berth = 0
-    has_arrived_at_pickup = prev_has_arrived_at_pickup
+    
 
     logbooks = []
     total_time_traveled = previous_total_time_traveled
@@ -71,6 +71,10 @@ def auto_fill_logbook(
         current_on_duty_hour += 0.5
         time_spent_in_driving += 0.5
         total_time_traveled += 0.5
+        time_traveled_within_eight_hrs += 30
+        miles_traveled += (
+            total_distance_miles / driving_time
+        ) * 30  # Convert minutes to miles
 
         #Drive away from the location
         new_log["logbook"].append({"hour": current_hour, "row": "driving"})
@@ -195,7 +199,7 @@ def auto_fill_logbook(
                 total_time_traveled,  # Keep tracking time across days
                 time_to_stay_in_sleeper_berth,
                 miles_traveled,
-                prev_has_arrived_at_pickup = False
+                has_arrived_at_pickup = False
             )
 
             return logbooks + next_day_logs  # Combine all logbooks
@@ -208,7 +212,7 @@ def auto_fill_logbook(
         current_on_duty_hour += 0.5
         time_spent_in_on_duty += 0.5
         time_traveled_within_eight_hrs = 0
-        prev_has_arrived_at_pickup = True
+        has_arrived_at_pickup = True
 
         new_log["logbook"].append(
             {"hour": current_hour, "row": "on-duty", "action": "Pickup"}
@@ -290,7 +294,7 @@ def auto_fill_logbook(
                 total_time_traveled,  # Keep tracking time across days
                 time_to_stay_in_sleeper_berth,
                 miles_traveled,
-                prev_has_arrived_at_pickup
+                has_arrived_at_pickup
             )
 
             return logbooks + next_day_logs  # Combine all logbooks
