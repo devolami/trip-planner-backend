@@ -4,12 +4,11 @@ def auto_fill_logbook(
     total_distance_miles: float,
     previous_total_time_traveled: float = 0,
     prev_sleeper_berth_hr: float = 0,
-    prev_miles_traveled: float = 0,
+    miles_traveled: float = 0,
     has_arrived_at_pickup: bool = False,
 ):
     """
     Simulates and generates a driver's logbook based on given parameters.
-
     Args:
         current_cycle_hours: Hours already used in the current cycle.
         duration_from_current_location_to_pickup: Duration in minutes to reach pickup.
@@ -23,7 +22,6 @@ def auto_fill_logbook(
     """
 
     driving_time = total_time_minutes
-    miles_traveled = prev_miles_traveled  # Track distance driven
     time_traveled_within_eight_hrs = 0
     current_on_duty_hour = 0
 
@@ -148,7 +146,7 @@ def auto_fill_logbook(
             time_spent_in_on_duty,
             action="Pre-trip/TIV",
         )
-        # Step 4: Start Driving to Pickup
+        # Step 4: Start Driving to Pickup or drop-off
         (
             current_hour,
             current_on_duty_hour,
@@ -174,21 +172,22 @@ def auto_fill_logbook(
     ):
         # Base Condition: Stop Recursion if pickup location is reached.
         if total_time_traveled >= duration_from_current_location_to_pickup:
+
             break
         (
             current_hour,
             current_on_duty_hour,
+            time_spent_in_driving,
             total_time_traveled,
             time_traveled_within_eight_hrs,
-            time_spent_in_driving,
             miles_traveled,
         ) = drive(
             new_log,
             current_hour,
             current_on_duty_hour,
+            time_spent_in_driving,
             total_time_traveled,
             time_traveled_within_eight_hrs,
-            time_spent_in_driving,
             miles_traveled,
             total_distance_miles,
             driving_time,
@@ -196,6 +195,7 @@ def auto_fill_logbook(
 
         # Mandatory 30-min break after at least every 8 hours of driving
         if time_traveled_within_eight_hrs >= MAX_DRIVING_WITHIN_EIGHT_HRS:
+            time_traveled_within_eight_hrs = 0
 
             current_hour, time_spent_in_off_duty = switch_to_off_duty(
                 new_log,
@@ -223,7 +223,6 @@ def auto_fill_logbook(
                 total_distance_miles,
                 driving_time,
             )
-            time_traveled_within_eight_hrs = 0
 
         # Refuelling
         if miles_traveled >= MAX_MILES_BEFORE_REFUELING:
@@ -281,9 +280,8 @@ def auto_fill_logbook(
             new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
 
             next_day_logs = auto_fill_logbook(
-                duration_from_current_location_to_pickup
-                - total_time_traveled,  # Remaining travel time to pickup
-                total_time_minutes,  # Remaining total trip time
+                duration_from_current_location_to_pickup,
+                driving_time,  # Remaining total trip time
                 total_distance_miles,
                 total_time_traveled,  # Keep tracking time across days
                 sleeper_time,
@@ -333,17 +331,17 @@ def auto_fill_logbook(
         (
             current_hour,
             current_on_duty_hour,
+            time_spent_in_driving,
             total_time_traveled,
             time_traveled_within_eight_hrs,
-            time_spent_in_driving,
             miles_traveled,
         ) = drive(
             new_log,
             current_hour,
             current_on_duty_hour,
+            time_spent_in_driving,
             total_time_traveled,
             time_traveled_within_eight_hrs,
-            time_spent_in_driving,
             miles_traveled,
             total_distance_miles,
             driving_time,
@@ -351,6 +349,7 @@ def auto_fill_logbook(
 
         # Mandatory 30-min break after at least every 8 hours of driving
         if time_traveled_within_eight_hrs >= MAX_DRIVING_WITHIN_EIGHT_HRS:
+            time_traveled_within_eight_hrs = 0
             current_hour, time_spent_in_off_duty = switch_to_off_duty(
                 new_log,
                 current_hour,
@@ -377,7 +376,6 @@ def auto_fill_logbook(
                 total_distance_miles,
                 driving_time,
             )
-            time_traveled_within_eight_hrs = 0
 
         # Refuelling
         if miles_traveled >= MAX_MILES_BEFORE_REFUELING:
@@ -437,8 +435,8 @@ def auto_fill_logbook(
 
             # Start a New Day & Continue Logging (Recursive Call)
             next_day_logs = auto_fill_logbook(
-                driving_time - total_time_traveled,  # Remaining travel time to pickup
-                total_time_minutes,  # Remaining total trip time
+                duration_from_current_location_to_pickup,  
+                driving_time,  # total trip time
                 total_distance_miles,
                 total_time_traveled,  # Keep tracking time across days
                 sleeper_time,
@@ -537,12 +535,12 @@ def start_driving(
     current_hour += LOG_HALF_MINUTE
     current_on_duty_hour += LOG_HALF_MINUTE
     time_spent_in_driving += LOG_HALF_MINUTE
-    total_time_traveled += LOG_HALF_MINUTE
+    total_time_traveled += HALF_MINUTE
     time_traveled_within_eight_hrs += HALF_MINUTE
     miles_traveled += (
         total_distance_miles / driving_time
     ) * HALF_MINUTE  # Convert minutes to miles
-
+    
     log["logbook"].append({"hour": current_hour, "row": "driving"})
     return (
         current_hour,
@@ -558,9 +556,9 @@ def drive(
     log,
     current_hour,
     current_on_duty_hour,
+    time_spent_in_driving,
     total_time_traveled,
     time_traveled_within_eight_hrs,
-    time_spent_in_driving,
     miles_traveled,
     total_distance_miles,
     driving_time,
@@ -573,13 +571,14 @@ def drive(
     miles_traveled += (
         total_distance_miles / driving_time
     ) * HALF_MINUTE  # Convert minutes to miles
+  
 
     log["logbook"].append({"hour": current_hour, "row": "driving"})
     return (
         current_hour,
         current_on_duty_hour,
+        time_spent_in_driving,
         total_time_traveled,
         time_traveled_within_eight_hrs,
-        time_spent_in_driving,
         miles_traveled,
     )
