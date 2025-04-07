@@ -6,6 +6,7 @@ def auto_fill_logbook(
     prev_sleeper_berth_hr: float = 0,
     miles_traveled: float = 0,
     has_arrived_at_pickup: bool = False,
+    continue_driving: bool = False
 ):
     """
     Simulates and generates a driver's logbook based on given parameters.
@@ -22,8 +23,10 @@ def auto_fill_logbook(
     """
 
     driving_time = total_time_minutes
+    prev_time_spent_in_driving = 0
     time_traveled_within_eight_hrs = 0
     current_on_duty_hour = 0
+    continue_driving_from_prev_day = continue_driving
 
     time_spent_in_off_duty = 0
     time_spent_in_on_duty = 0
@@ -56,38 +59,9 @@ def auto_fill_logbook(
     new_log = generate_new_log()
     logbooks.append(new_log)
 
-    if prev_sleeper_berth_hr >= MAX_SLEEPER_BERTH:
-        # Step 1: Start at On-Duty (Vehicle Check)
-
-        current_hour, current_on_duty_hour, time_spent_in_on_duty = switch_to_on_duty(
-            new_log,
-            current_hour,
-            current_on_duty_hour,
-            time_spent_in_on_duty,
-            action="Pre-trip/TIV",
-        )
-
-        # Step 3: Start Driving to Pickup or drop-off
-        (
-            current_hour,
-            current_on_duty_hour,
-            time_spent_in_driving,
-            total_time_traveled,
-            time_traveled_within_eight_hrs,
-            miles_traveled,
-        ) = start_driving(
-            new_log,
-            current_hour,
-            current_on_duty_hour,
-            time_spent_in_driving,
-            total_time_traveled,
-            time_traveled_within_eight_hrs,
-            miles_traveled,
-            total_distance_miles,
-            driving_time,
-        )
-
-    elif 0 < prev_sleeper_berth_hr < MAX_SLEEPER_BERTH:
+    #Handling start of logging logic:
+   
+    if 0 < prev_sleeper_berth_hr < MAX_SLEEPER_BERTH: # FIRST SCENARIO:
 
         # Step 1: Start at sleeper berth until you have spent 10 hours there
         sleeper_time = MAX_SLEEPER_BERTH - prev_sleeper_berth_hr
@@ -129,42 +103,72 @@ def auto_fill_logbook(
             driving_time,
         )
     else:
+        if not continue_driving_from_prev_day: # SECOND SCENARIO: FIRST DAY OF DUTY
 
-        current_hour, time_spent_in_off_duty = switch_to_off_duty(
-            new_log,
-            current_hour,
-            time_spent_in_off_duty,
-            rate=RESUMPTION_TIME,
-            action=None,
-        )
+            # Step 1: Start from off-duty (Resumption)
+            current_hour, time_spent_in_off_duty = switch_to_off_duty(
+                new_log,
+                current_hour,
+                time_spent_in_off_duty,
+                rate=RESUMPTION_TIME,
+                action=None,
+            )
 
-        # Step 2: Switch to On-Duty (Vehicle Check)
-        current_hour, current_on_duty_hour, time_spent_in_on_duty = switch_to_on_duty(
-            new_log,
-            current_hour,
-            current_on_duty_hour,
-            time_spent_in_on_duty,
-            action="Pre-trip/TIV",
-        )
-        # Step 4: Start Driving to Pickup or drop-off
-        (
-            current_hour,
-            current_on_duty_hour,
-            time_spent_in_driving,
-            total_time_traveled,
-            time_traveled_within_eight_hrs,
-            miles_traveled,
-        ) = start_driving(
-            new_log,
-            current_hour,
-            current_on_duty_hour,
-            time_spent_in_driving,
-            total_time_traveled,
-            time_traveled_within_eight_hrs,
-            miles_traveled,
-            total_distance_miles,
-            driving_time,
-        )
+            # Step 2: Switch to On-Duty (Vehicle Check)
+            current_hour, current_on_duty_hour, time_spent_in_on_duty = switch_to_on_duty(
+                new_log,
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_on_duty,
+                action="Pre-trip/TIV",
+            )
+            # Step 3: Start Driving to Pickup or drop-off
+            (
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_driving,
+                total_time_traveled,
+                time_traveled_within_eight_hrs,
+                miles_traveled,
+            ) = start_driving(
+                new_log,
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_driving,
+                total_time_traveled,
+                time_traveled_within_eight_hrs,
+                miles_traveled,
+                total_distance_miles,
+                driving_time,
+            )
+        else: # THIRD SCENARIO: CONTINUE DRIVING FROM THE PREVIOUS DAY
+             # Step 1: Perform pre-trip operations
+             current_hour, current_on_duty_hour, time_spent_in_on_duty = switch_to_on_duty(
+                new_log,
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_on_duty,
+                action="Pre-trip/TIV",
+            )
+             # Step 2: Start driving
+             (
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_driving,
+                total_time_traveled,
+                time_traveled_within_eight_hrs,
+                miles_traveled,
+            ) = start_driving(
+                new_log,
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_driving,
+                total_time_traveled,
+                time_traveled_within_eight_hrs,
+                miles_traveled,
+                total_distance_miles,
+                driving_time,
+            )
 
     while (
         total_time_traveled < duration_from_current_location_to_pickup
@@ -255,11 +259,66 @@ def auto_fill_logbook(
                 total_distance_miles,
                 driving_time,
             )
+        # Comply with maximum 11-hour driving period
+        if time_spent_in_driving >= MAX_DRIVING_TIME:
+            sleeper_time = 24 - current_hour
+            actual_sleeper = 10 if sleeper_time > 10 else sleeper_time
+            prev_time_spent_in_driving += time_spent_in_driving #save time spent in driving before resetting.
+           
+            time_spent_in_driving = 0 # reset time spent in driving here.
 
-        if (
-            time_spent_in_driving >= MAX_DRIVING_TIME
-            or current_on_duty_hour >= MAX_ON_DUTY_TIME
-        ):
+            (
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_sleeper_berth,
+            ) = switch_to_sleeper_berth(
+                new_log,
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_sleeper_berth,
+                rate=actual_sleeper,
+            )
+                        
+            if sleeper_time < 10:
+                new_log["timeSpentInOffDuty"] = time_spent_in_off_duty
+                new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
+                new_log["timeSpentInDriving"] = time_spent_in_driving + prev_time_spent_in_driving
+                new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
+
+                next_day_logs = auto_fill_logbook(
+                    duration_from_current_location_to_pickup,
+                    driving_time,  # Remaining total trip time
+                    total_distance_miles,
+                    total_time_traveled,  # Keep tracking time across days
+                    sleeper_time,
+                    miles_traveled,
+                    has_arrived_at_pickup=False,
+                    continue_driving = False
+                )
+
+                return logbooks + next_day_logs  # Combine all logbooks
+            elif sleeper_time == 10:
+                new_log["timeSpentInOffDuty"] = time_spent_in_off_duty
+                new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
+                new_log["timeSpentInDriving"] = time_spent_in_driving + prev_time_spent_in_driving
+                new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
+
+                next_day_logs = auto_fill_logbook(
+                    duration_from_current_location_to_pickup,
+                    driving_time,  # Remaining total trip time
+                    total_distance_miles,
+                    total_time_traveled,  # Keep tracking time across days
+                    sleeper_time,
+                    miles_traveled,
+                    has_arrived_at_pickup=False,
+                    continue_driving = True
+                )
+
+                return logbooks + next_day_logs  # Combine all logbooks
+
+
+        # Comply with maximum 14-hour on duty period
+        if current_on_duty_hour >= MAX_ON_DUTY_TIME:
             sleeper_time = 24 - current_hour
 
             (
@@ -276,7 +335,7 @@ def auto_fill_logbook(
 
             new_log["timeSpentInOffDuty"] = time_spent_in_off_duty
             new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
-            new_log["timeSpentInDriving"] = time_spent_in_driving
+            new_log["timeSpentInDriving"] = time_spent_in_driving + prev_time_spent_in_driving
             new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
 
             next_day_logs = auto_fill_logbook(
@@ -409,11 +468,67 @@ def auto_fill_logbook(
                 driving_time,
             )
 
-        # Stop Driving at least every 11 total hours of driving or 14 hours of on-duty (Switch to Sleeper Berth)
-        if (
-            time_spent_in_driving >= MAX_DRIVING_TIME
-            or current_on_duty_hour >= MAX_ON_DUTY_TIME
-        ):
+         # Comply with maximum 11-hour driving period 
+        if time_spent_in_driving >= MAX_DRIVING_TIME:
+            sleeper_time = 24 - current_hour
+            prev_time_spent_in_driving += time_spent_in_driving # save time spent in driving before resetting.
+           
+            time_spent_in_driving = 0 # reset time spent in driving here.
+            
+            actual_sleeper = 10 if sleeper_time > 10 else sleeper_time
+
+            (
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_sleeper_berth,
+            ) = switch_to_sleeper_berth(
+                new_log,
+                current_hour,
+                current_on_duty_hour,
+                time_spent_in_sleeper_berth,
+                rate=actual_sleeper,
+            )
+           
+            
+            if sleeper_time < 10:
+                new_log["timeSpentInOffDuty"] = time_spent_in_off_duty
+                new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
+                new_log["timeSpentInDriving"] = prev_time_spent_in_driving + time_spent_in_driving
+                new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
+
+                next_day_logs = auto_fill_logbook(
+                    duration_from_current_location_to_pickup,
+                    driving_time,  # Remaining total trip time
+                    total_distance_miles,
+                    total_time_traveled,  # Keep tracking time across days
+                    sleeper_time,
+                    miles_traveled,
+                    has_arrived_at_pickup=True,
+                    continue_driving = False
+                )
+
+                return logbooks + next_day_logs  # Combine all logbooks
+            elif sleeper_time == 10:
+                new_log["timeSpentInOffDuty"] = time_spent_in_off_duty
+                new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
+                new_log["timeSpentInDriving"] = prev_time_spent_in_driving + time_spent_in_driving
+                new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
+
+                next_day_logs = auto_fill_logbook(
+                    duration_from_current_location_to_pickup,
+                    driving_time,  # Remaining total trip time
+                    total_distance_miles,
+                    total_time_traveled,  # Keep tracking time across days
+                    sleeper_time,
+                    miles_traveled,
+                    has_arrived_at_pickup=True,
+                    continue_driving = True
+                )
+
+                return logbooks + next_day_logs  # Combine all logbooks
+         # Comply with maximum 14-hour on duty period
+        if current_on_duty_hour >= MAX_ON_DUTY_TIME:
+            
             sleeper_time = 24 - current_hour
 
             (
@@ -430,7 +545,7 @@ def auto_fill_logbook(
 
             new_log["timeSpentInOffDuty"] = time_spent_in_off_duty
             new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
-            new_log["timeSpentInDriving"] = time_spent_in_driving
+            new_log["timeSpentInDriving"] = time_spent_in_driving + prev_time_spent_in_driving
             new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
 
             # Start a New Day & Continue Logging (Recursive Call)
@@ -468,7 +583,7 @@ def auto_fill_logbook(
 
     new_log["timeSpentInOffDuty"] = time_spent_in_off_duty
     new_log["timeSpentInOnDuty"] = time_spent_in_on_duty
-    new_log["timeSpentInDriving"] = time_spent_in_driving
+    new_log["timeSpentInDriving"] = time_spent_in_driving + prev_time_spent_in_driving
     new_log["timeSpentInSleeperBerth"] = time_spent_in_sleeper_berth
 
     return logbooks  # Return multiple days of logs
@@ -511,6 +626,7 @@ def switch_to_sleeper_berth(
     current_hour += rate
     time_spent_in_sleeper_berth += rate
     current_on_duty_hour = 0
+    
 
     log["logbook"].append({"hour": current_hour, "row": "sleeper"})
     return (

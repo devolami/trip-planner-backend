@@ -5,7 +5,6 @@ from .models import LogEntry
 from .serializers import LogSerializers
 from .autofill_logbook import auto_fill_logbook
 
-
 class LogEntryViewSet(viewsets.ModelViewSet):
     queryset = LogEntry.objects.all()
     serializer_class = LogSerializers
